@@ -6,25 +6,26 @@
 # mersenne.org. Should also work with CUDALucas and similar programs
 # with minimal changes.
 
-import sys
+# import sys
+# from time import sleep
 import os.path
 import re
 import os
-
 import cookielib
 import urllib2
 import urllib
-from time import sleep
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
+
 
 def ass_generate(assignment):
     output = ""
     for key in assignment:
         output += key + "=" + assignment[key] + "&"
-    #return output.rstrip("&")
+    # return output.rstrip("&")
     return output
+
 
 def cleanup(data):
     # as in submit_spider; urllib2.quote does not quite work here
@@ -34,6 +35,7 @@ def cleanup(data):
     output = re.sub("\n", "%0A", output)
     return output
 
+
 def greplike(pattern, l):
     output = []
     for line in l:
@@ -42,10 +44,12 @@ def greplike(pattern, l):
             output.append(s.groups()[0])
     return output
 
+
 def num_topup(l, targetsize):
     num_existing = len(l)
     num_needed = targetsize - num_existing
     return max(num_needed, 0)
+
 
 def readonly_file(filename):
     # Used when there is no intention to write the file back, so don't
@@ -56,17 +60,15 @@ def readonly_file(filename):
         File.close()
     else:
         contents = ""
-
     return contents
+
 
 def read_list_file(filename):
     # Used when we plan to write the new version, so use locking
     lockfile = filename + ".lck"
-
     try:
         fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
         os.close(fd)
-
         if os.path.exists(filename):
             File = open(filename, "r")
             contents = File.readlines()
@@ -74,18 +76,17 @@ def read_list_file(filename):
             return map(lambda x: x.rstrip(), contents)
         else:
             return []
-
-    except OSError, e:
-        if e.errno == 17:
+    except OSError:
+        if OSError.errno == 17:
             return "locked"
         else:
             raise
+
 
 def write_list_file(filename, l, mode="w"):
     # Assume we put the lock in upon reading the file, so we can
     # safely write the file and remove the lock
     lockfile = filename + ".lck"
-
     # A "null append" is meaningful, as we can call this to clear the
     # lockfile. In this case the main file need not be touched.
     if mode != "a" or len(l) > 0:
@@ -93,15 +94,13 @@ def write_list_file(filename, l, mode="w"):
         File = open(filename, mode)
         File.write(content)
         File.close()
-
     os.remove(lockfile)
+
 
 def primenet_fetch(num_to_get):
     global primenet_login
-    
     if not primenet_login:
         return []
-
     # <option value="102">World record tests
     # <option value="100">Smallest available first-time tests
     # <option value="101">Double-check tests
@@ -109,9 +108,7 @@ def primenet_fetch(num_to_get):
                   "num_to_get": str(num_to_get),
                   "pref": options.worktype,
                   "exp_lo": "",
-                  "exp_hi": "",
-    }
-    
+                  "exp_hi": ""}
     try:
         r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
         return greplike(workpattern, r.readlines())
@@ -119,41 +116,37 @@ def primenet_fetch(num_to_get):
         print("URL open error at primenet_fetch")
         return []
 
+
 def get_assignment():
     w = read_list_file(workfile)
     if w == "locked":
         return "locked"
-
     tasks = greplike(workpattern, w)
     tasks_keep = []
-
     # If the work is finished, remove it from tasks
     tasks = filter(unfinished, tasks)
-
     num_to_get = num_topup(tasks, options.num_cache)
-
     if num_to_get < 1:
         print("Cache full, not getting new work")
     else:
         print("Fetching " + str(num_to_get) + " assignments")
         tasks += primenet_fetch(num_to_get)
-
     # Output work for cllucas
     if len(tasks) > 0:
         mersenne = mersenne_find_task(tasks[0])
     else:
         mersenne = ""
-
     write_list_file(workfile, tasks)
-
     return mersenne
-    
+
+
 def mersenne_find_task(line):
     s = re.search(r",([0-9]+),[0-9]+,[0-9]+", line)
     if s:
         return s.groups()[0]
     else:
         return ""
+
 
 def unfinished(line):
     finished = readonly_file(resultsfile)
@@ -163,35 +156,27 @@ def unfinished(line):
     else:
         return True
 
+
 def submit_work():
     # There is no concept of incomplete results, as in mfloop.py, so
     # we simply send every sensible line in resultsfile. But only
     # delete after a succesful send, and even those are backed up to
     # sentfile.
-
     files = [resultsfile, sentfile]
     rs = map(read_list_file, files)
-
     if "locked" in rs:
         # Remove the lock in case one of these was unlocked at start
         for i in range(len(files)):
             if rs[i] != "locked":
                 write_list_file(files[i], [], "a")
-                
         return "locked"
-
     results = rs[0]
-
     # Only for new results, to be appended to sentfile
     sent = []
-
     # Example: M( 110503 )P, n = 6144, clLucas v1.00
     results_send = greplike(r"M\( ([0-9]*) \).*", results)
-
     results_keep = []
-
     # Use the textarea form to submit several results at once.
-
     if len(results_send) == 0:
         print("No complete results found to send.")
         # Don't just return here, files are still locked...
@@ -201,11 +186,8 @@ def submit_work():
             while sum(map(len, sendbatch)) < sendlimit and \
                   len(results_send) > 0:
                 sendbatch.append(results_send.pop(0))
-
             data = "\n".join(sendbatch)
-        
             print("Submitting\n" + data)
-
             try:
                 r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
                 if "processing:" in r.read():
@@ -216,17 +198,18 @@ def submit_work():
             except urllib2.URLError:
                 results_keep += sendbatch
                 print("URL open error")
-
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
 
+
 def fft_opt(m):
+    """
     # Optimal FFT size for clLucas
-    
     if int(m) > 38000000:
-	fft = 4096
+        fft = 4096
     else:
-	fft = 2048
+        fft = 2048
+    """
 
     # clLucas 1.04 has automatic size incrementing. This script can
     # still be useful for finding more optimal values, but in the
