@@ -14,6 +14,7 @@ import os
 import cookielib
 import urllib2
 import urllib
+import argparse
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
@@ -55,9 +56,9 @@ def readonly_file(filename):
     # Used when there is no intention to write the file back, so don't
     # check or write lockfiles. Also returns a single string, no list.
     if os.path.exists(filename):
-        File = open(filename, "r")
-        contents = File.read()
-        File.close()
+        file = open(filename, "r")
+        contents = file.read()
+        file.close()
     else:
         contents = ""
     return contents
@@ -70,9 +71,9 @@ def read_list_file(filename):
         fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
         os.close(fd)
         if os.path.exists(filename):
-            File = open(filename, "r")
-            contents = File.readlines()
-            File.close()
+            file = open(filename, "r")
+            contents = file.readlines()
+            file.close()
             return map(lambda x: x.rstrip(), contents)
         else:
             return []
@@ -91,9 +92,9 @@ def write_list_file(filename, l, mode="w"):
     # lockfile. In this case the main file need not be touched.
     if mode != "a" or len(l) > 0:
         content = "\n".join(l) + "\n"
-        File = open(filename, mode)
-        File.write(content)
-        File.close()
+        file = open(filename, mode)
+        file.write(content)
+        file.close()
     os.remove(lockfile)
 
 
@@ -183,8 +184,7 @@ def submit_work():
     else:
         while len(results_send) > 0:
             sendbatch = []
-            while sum(map(len, sendbatch)) < sendlimit and \
-                  len(results_send) > 0:
+            while sum(map(len, sendbatch)) < sendlimit and len(results_send) > 0:
                 sendbatch.append(results_send.pop(0))
             data = "\n".join(sendbatch)
             print("Submitting\n" + data)
@@ -203,33 +203,26 @@ def submit_work():
 
 
 def fft_opt(m):
-    """
     # Optimal FFT size for clLucas
     if int(m) > 38000000:
         fft = 4096
     else:
         fft = 2048
-    """
-
     # clLucas 1.04 has automatic size incrementing. This script can
     # still be useful for finding more optimal values, but in the
     # meantime, start with something basic.
     fft = 2048
-        
     # Format for clLucas
     return ["-f", str(fft) + "K"]
 
+
 def network_getwork():
     global options, primenet, primenet_baseurl, primenet_login
-
     mersenne = ""
-    
     try:
         # Log in to primenet
         login_data = {"user_login": options.username,
-                      "user_password": options.password,
-                  }
-        
+                      "user_password": options.password}
         # This makes a POST instead of GET
         data = urllib.urlencode(login_data)
         r = primenet.open(primenet_baseurl + "default.php", data)
@@ -249,27 +242,27 @@ def network_getwork():
             submit_work()
         else:
             print("Login failed.")
-
     except urllib2.URLError:
         print("Primenet URL open error")
-
     return mersenne
-        
-import argparse
+
+
+# Main Program.  (Put in "def main()"?)
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-o", "--cllopts", help="CLLucas options in a single string, e.g. '-d 0 -polite 0 -threads 128 -sixstepfft'")
-
+parser.add_argument("-o", "--cllopts",
+                    help="CLLucas options in a single string, e.g. '-d 0 -polite 0 -threads 128 -sixstepfft'")
 parser.add_argument("-u", "--username", dest="username", required=True, help="Primenet user name")
 parser.add_argument("-p", "--password", dest="password", required=True, help="Primenet password")
-
-parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default %(default)d")
+parser.add_argument("-n", "--num_cache", type=int, default=1,
+                    help="Number of assignments to cache, default %(default)d")
 # -t is reserved for timeout as in mfloop.py, although not currently used here
-parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
-parser.add_argument("-w", "--workdir", dest="workdir", default=".", help="Working directory with clLucas binary, default current")
+parser.add_argument("-T", "--worktype", dest="worktype", default="101",
+                    help="Worktype code, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
+parser.add_argument("-w", "--workdir", dest="workdir", default=".",
+                    help="Working directory with clLucas binary, default current")
 
 options = parser.parse_args()
-
 workdir = os.path.expanduser(options.workdir)
 
 workfile = os.path.join(workdir, "worktodo.txt")
@@ -293,7 +286,7 @@ primenet_login = False
 # Assuming clLucas in the workdir, could be generalized for any path
 # and alternatives like CudaLucas...
 binary = os.path.join(workdir, "clLucas")
-    
+
 while True:
     work = network_getwork()
     
