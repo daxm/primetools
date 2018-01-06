@@ -100,7 +100,7 @@ def get_assignment_llloop():
     return mersenne
 
 
-def submit_work_mfloop():
+def submit_work_mfloop(resultsfile='results.txt', sentfile='results_sent.txt'):
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
 
@@ -218,9 +218,9 @@ def cleanup(data):
     return output
 
 
-def debug_print(text):
-    if options.debug:
-        print(progname + ": " + text)
+def debug_print(msg='', debug=False):
+    if debug:
+        print("DEBUG: {}".format(msg))
 
 
 def greplike(pattern, l):

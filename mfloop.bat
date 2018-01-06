@@ -6,6 +6,7 @@ set PrimenetUsername=test
 set PrimenetPassword=test123
 REM How much work to get: If using gpu72, use GHzdays. If not, number of assignments.
 set WorkCache=100
+
 REM gpu72 0/no 1/yes
 set UseGPU72=1
 set gpu72user=test
